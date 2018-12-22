@@ -11,9 +11,12 @@ namespace Antinet {
 	/// 反调试类
 	/// </summary>
 	public static unsafe class AntiDebugger {
+		private delegate bool IsDebuggerAttachedDelegate();
+
 		private static bool _isManagedDebuggerPrevented;
 		private static bool _isManagedInitialized;
 		private static byte* _pIsDebuggerAttached;
+		private static IsDebuggerAttachedDelegate _isDebuggerAttached;
 		private static uint _isDebuggerAttachedLength;
 		private static uint _isDebuggerAttachedCrc32;
 
@@ -62,7 +65,7 @@ namespace Antinet {
 		}
 
 		/// <summary>
-		/// 使用 <see cref="Debugger.IsAttached"/> 检查是否存在托管调试器。
+		/// 使用 clr!DebugDebugger::IsDebuggerAttached() 检查是否存在托管调试器。
 		/// 注意，此方法不能检测到非托管调试器（如OllyDbg，x64dbg）的存在。
 		/// </summary>
 		/// <returns></returns>
@@ -75,7 +78,7 @@ namespace Antinet {
 			bool is64Bit;
 
 			InitializeManaged();
-			if (Debugger.IsAttached)
+			if (_isDebuggerAttached())
 				// 此时肯定有托管调试器附加
 				return true;
 			// 此时不能保证托管调试器未调试当前进程
@@ -116,6 +119,7 @@ namespace Antinet {
 			switch (Environment.Version.Major) {
 			case 2:
 				_pIsDebuggerAttached = (byte*)typeof(Debugger).GetMethod("IsDebuggerAttached", BindingFlags.NonPublic | BindingFlags.Static).MethodHandle.GetFunctionPointer();
+				// 和.NET 4.x不一样，这个Debugger.IsAttached的get属性调用了IsDebuggerAttached()，而不是直通CLR内部。
 				clrModuleHandle = GetModuleHandle("mscorwks.dll");
 				break;
 			case 4:
@@ -127,6 +131,7 @@ namespace Antinet {
 			default:
 				throw new NotSupportedException();
 			}
+			_isDebuggerAttached = (IsDebuggerAttachedDelegate)Marshal.GetDelegateForFunctionPointer((IntPtr)_pIsDebuggerAttached, typeof(IsDebuggerAttachedDelegate));
 			if (clrModuleHandle == null)
 				throw new InvalidOperationException();
 			stringBuilder = new StringBuilder((int)MAX_PATH);
