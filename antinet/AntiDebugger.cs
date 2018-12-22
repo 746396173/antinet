@@ -32,16 +32,16 @@ namespace Antinet {
 		}
 
 		/// <summary>
-		/// 检查是否存在任意类型调试器。
+		/// 检测是否存在任意类型调试器。
 		/// </summary>
 		/// <returns></returns>
 		public static bool HasDebugger() {
 			return HasUnmanagedDebugger() || HasManagedDebugger();
-			// 检查是否存在非托管调试器的速度更快，效率更高，在CLR40下也能检测到托管调试器。
+			// 检测是否存在非托管调试器的速度更快，效率更高，在CLR40下也能检测到托管调试器。
 		}
 
 		/// <summary>
-		/// 检查是否存在非托管调试器。
+		/// 检测是否存在非托管调试器。
 		/// 在CLR20下，使用托管调试器调试进程，此方法返回 <see langword="false"/>，因为CLR20没有使用正常调试流程，Win32函数检测不到调试器。
 		/// 在CLR40下，使用托管调试器调试进程，此方法返回 <see langword="true"/>。
 		/// </summary>
@@ -65,7 +65,7 @@ namespace Antinet {
 		}
 
 		/// <summary>
-		/// 使用 clr!DebugDebugger::IsDebuggerAttached() 检查是否存在托管调试器。
+		/// 使用 clr!DebugDebugger::IsDebuggerAttached() 检测是否存在托管调试器。
 		/// 注意，此方法不能检测到非托管调试器（如OllyDbg，x64dbg）的存在。
 		/// </summary>
 		/// <returns></returns>
