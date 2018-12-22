@@ -26,10 +26,10 @@ namespace Antinet {
 	/// Clearing the debug flag could possibly solve this if you don't want it to hang.
 	/// </summary>
 	static class AntiManagedDebugger {
-		[DllImport("kernel32", CharSet = CharSet.Auto)]
+		[DllImport("kernel32.dll")]
 		static extern uint GetCurrentProcessId();
 
-		[DllImport("kernel32")]
+		[DllImport("kernel32.dll")]
 		static extern bool SetEvent(IntPtr hEvent);
 
 		class Info {
@@ -260,8 +260,8 @@ namespace Antinet {
 			IntPtr sectionsAddr;
 			int numSects;
 
-			[DllImport("kernel32", CharSet = CharSet.Auto)]
-			static extern IntPtr GetModuleHandle(string name);
+			[DllImport("kernel32.dll", BestFitMapping = false, CharSet = CharSet.Unicode, SetLastError = true)]
+			static extern IntPtr GetModuleHandle(string lpModuleName);
 
 			/// <summary>
 			/// Creates a <see cref="PEInfo"/> instance loaded from the CLR (clr.dll / mscorwks.dll)
@@ -276,8 +276,8 @@ namespace Antinet {
 
 			static IntPtr GetCLRAddress() {
 				if (Environment.Version.Major == 2)
-					return GetModuleHandle("mscorwks");
-				return GetModuleHandle("clr");
+					return GetModuleHandle("mscorwks.dll");
+				return GetModuleHandle("clr.dll");
 			}
 
 			/// <summary>
@@ -285,7 +285,7 @@ namespace Antinet {
 			/// </summary>
 			/// <param name="addr">Address of a PE image</param>
 			public PEInfo(IntPtr addr) {
-				this.imageBase = addr;
+				imageBase = addr;
 				Initialize();
 			}
 
@@ -301,31 +301,6 @@ namespace Antinet {
 				p += is32 ? 0x60 : 0x70;    // Skip optional header
 				p += 0x10 * 8;      // Skip data dirs
 				sectionsAddr = new IntPtr(p);
-			}
-
-			/// <summary>
-			/// Checks whether the address is within the image
-			/// </summary>
-			/// <param name="addr">Address</param>
-			public unsafe bool IsValidImageAddress(IntPtr addr) {
-				return IsValidImageAddress((void*)addr, 0);
-			}
-
-			/// <summary>
-			/// Checks whether the address is within the image
-			/// </summary>
-			/// <param name="addr">Address</param>
-			/// <param name="size">Number of bytes</param>
-			public unsafe bool IsValidImageAddress(IntPtr addr, uint size) {
-				return IsValidImageAddress((void*)addr, size);
-			}
-
-			/// <summary>
-			/// Checks whether the address is within the image
-			/// </summary>
-			/// <param name="addr">Address</param>
-			public unsafe bool IsValidImageAddress(void* addr) {
-				return IsValidImageAddress(addr, 0);
 			}
 
 			/// <summary>
@@ -388,20 +363,6 @@ namespace Antinet {
 			/// <param name="addr">Address</param>
 			public static bool IsAlignedPointer(IntPtr addr) {
 				return ((int)addr.ToInt64() & (IntPtr.Size - 1)) == 0;
-			}
-
-			/// <summary>
-			/// Checks whether a pointer is aligned
-			/// </summary>
-			/// <param name="addr">Address</param>
-			/// <param name="alignment">Alignment</param>
-			public static bool IsAligned(IntPtr addr, uint alignment) {
-				return ((uint)addr.ToInt64() & (alignment - 1)) == 0;
-			}
-
-			/// <inheritdoc/>
-			public override string ToString() {
-				return string.Format("{0:X8} - {1:X8}", (ulong)imageBase.ToInt64(), (ulong)imageEnd.ToInt64());
 			}
 		}
 	}
