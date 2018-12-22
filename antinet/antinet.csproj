@@ -8,8 +8,8 @@
     <ProjectGuid>{1D0DEB52-3655-4A0D-A36C-B0F288A12D41}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>antinet</RootNamespace>
-    <AssemblyName>antinet</AssemblyName>
+    <RootNamespace>Antinet</RootNamespace>
+    <AssemblyName>Antinet</AssemblyName>
     <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -17,29 +17,31 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\Debug\</OutputPath>
+    <OutputPath>..\bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>..\Debug\antinet.XML</DocumentationFile>
+    <DocumentationFile>..\bin\Debug\Antinet.xml</DocumentationFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>..\Release\</OutputPath>
+    <OutputPath>..\bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>..\Release\antinet.XML</DocumentationFile>
+    <DocumentationFile>..\bin\Release\Antinet.xml</DocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="AntiDebugger.cs" />
     <Compile Include="AntiManagedDebugger.cs" />
-    <Compile Include="AntiManagedProfiler.cs" />
+    <Compile Include="AntiPatcher.cs" />
+    <Compile Include="DynamicCrc32.cs" />
     <Compile Include="HandleProcessCorruptedStateExceptionsAttribute.cs" />
-    <Compile Include="PEInfo.cs" />
+    <Compile Include="Ldasm.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Anti managed debugger code. Written by de4dot@gmail.com
  * This code is in the public domain.
  * Official site: https://github.com/0xd4d/antinet
@@ -8,8 +8,9 @@ using System;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Text;
 
-namespace antinet {
+namespace Antinet {
 	/// <summary>
 	/// This class will make sure that no managed .NET debugger can attach and
 	/// debug this .NET process. This code assumes that it's Microsoft's .NET
@@ -24,7 +25,7 @@ namespace antinet {
 	/// some later time when this process is trying to send a debug message to the debugger.
 	/// Clearing the debug flag could possibly solve this if you don't want it to hang.
 	/// </summary>
-	public static class AntiManagedDebugger {
+	static class AntiManagedDebugger {
 		[DllImport("kernel32", CharSet = CharSet.Auto)]
 		static extern uint GetCurrentProcessId();
 
@@ -144,17 +145,33 @@ namespace antinet {
 			// thread has exited. A user who tries to attach will be greeted with an
 			// "unable to attach due to different versions etc" message. This will not stop
 			// already attached debuggers. Killing the debugger thread will.
+			// 翻译：
+			// 这不是必须的，但是这至少可以阻止托管调试器附加进程。
+			// 即使调试器附加成功，调试器也不会得到任何消息因为调试器线程已经退出。
+			// 尝试附加调试器会得到一个CORDBG_E_DEBUGGING_NOT_POSSIBLE（"由于 CLR 实现内的不兼容，因此不可能进行调试。"）之类的消息。
+			// 这（指的是把DebuggerIPCControlBlock的size字段设置为0）不能停止已附加的调试器。但是结束调试器线程可以停止已附加的调试器。
 			byte* pDebuggerIPCControlBlock = (byte*)*(IntPtr*)((byte*)pDebuggerRCThread + info.DebuggerRCThread_pDebuggerIPCControlBlock);
 			if (Environment.Version.Major == 2)
+				// CLR 2.0下，这个是一个数组指针（DebuggerIPCControlBlock**），而CLR 4.0+是ebuggerIPCControlBlock*
 				pDebuggerIPCControlBlock = (byte*)*(IntPtr*)pDebuggerIPCControlBlock;
 			// Set size field to 0. mscordbi!CordbProcess::VerifyControlBlock() will fail
 			// when it detects an unknown size.
+			// 翻译：
+			// 把size字段设置为0，mscordbi!CordbProcess::VerifyControlBlock()会失败当它发现大小未知。
 			*(uint*)pDebuggerIPCControlBlock = 0;
+			// 我添加的：
+			// mscordbi!CordbProcess::VerifyControlBlock()会在附加调试器时被调用，所以size字段被设置为0之后，无法附加调试器
 
 			// Signal debugger thread to exit
 			*((byte*)pDebuggerRCThread + info.DebuggerRCThread_shouldKeepLooping) = 0;
 			IntPtr hEvent = *(IntPtr*)((byte*)pDebuggerRCThread + info.DebuggerRCThread_hEvent1);
 			SetEvent(hEvent);
+			// 我添加的：
+			// 以上三行代码是模拟DebuggerRCThread::AsyncStop()。
+			// 把shouldKeepLooping设置为false会让已附加的调试器与被调试进程失去联系。
+			// 据我测试，SetEvent是否执行都无所谓。
+			// 不设置shouldKeepLooping为false，单独执行SetEvent也没有什么效果。
+			// 但是为了完整模拟DebuggerRCThread::AsyncStop()，0xd4d还是把这3行代码都写上去了，我们也不做其它修改。
 
 			return true;
 		}
@@ -169,7 +186,7 @@ namespace antinet {
 				if (Environment.Version.Revision <= 17020)
 					return IntPtr.Size == 4 ? info_CLR40_x86_1 : info_CLR40_x64;
 				return IntPtr.Size == 4 ? info_CLR40_x86_2 : info_CLR40_x64;
-			default: goto case 4;	// Assume CLR 4.0
+			default: goto case 4;   // Assume CLR 4.0
 			}
 		}
 
@@ -177,7 +194,7 @@ namespace antinet {
 		/// Tries to find the address of the <c>DebuggerRCThread</c> instance in memory
 		/// </summary>
 		/// <param name="info">The debugger info we need</param>
-		[HandleProcessCorruptedStateExceptions, SecurityCritical]	// Req'd on .NET 4.0
+		[HandleProcessCorruptedStateExceptions, SecurityCritical]   // Req'd on .NET 4.0
 		static unsafe IntPtr FindDebuggerRCThreadAddress(Info info) {
 			uint pid = GetCurrentProcessId();
 
@@ -230,6 +247,162 @@ namespace antinet {
 			}
 
 			return IntPtr.Zero;
+		}
+
+		/*
+		 * PE helper code. Written by de4dot@gmail.com
+		 * This code is in the public domain.
+		 * Official site: https://github.com/0xd4d/antinet
+		 */
+		class PEInfo {
+			IntPtr imageBase;
+			IntPtr imageEnd;
+			IntPtr sectionsAddr;
+			int numSects;
+
+			[DllImport("kernel32", CharSet = CharSet.Auto)]
+			static extern IntPtr GetModuleHandle(string name);
+
+			/// <summary>
+			/// Creates a <see cref="PEInfo"/> instance loaded from the CLR (clr.dll / mscorwks.dll)
+			/// </summary>
+			/// <returns>The new instance or <c>null</c> if we failed</returns>
+			public static PEInfo GetCLR() {
+				var clrAddr = GetCLRAddress();
+				if (clrAddr == IntPtr.Zero)
+					return null;
+				return new PEInfo(clrAddr);
+			}
+
+			static IntPtr GetCLRAddress() {
+				if (Environment.Version.Major == 2)
+					return GetModuleHandle("mscorwks");
+				return GetModuleHandle("clr");
+			}
+
+			/// <summary>
+			/// Constructor
+			/// </summary>
+			/// <param name="addr">Address of a PE image</param>
+			public PEInfo(IntPtr addr) {
+				this.imageBase = addr;
+				Initialize();
+			}
+
+			unsafe void Initialize() {
+				byte* p = (byte*)imageBase;
+				p += *(uint*)(p + 0x3C);    // Get NT headers
+				p += 4 + 2; // Skip magic + machine
+				numSects = *(ushort*)p;
+				p += 2 + 0x10;  // Skip the rest of file header
+				bool is32 = *(ushort*)p == 0x010B;
+				uint sizeOfImage = *(uint*)(p + 0x38);
+				imageEnd = new IntPtr((byte*)imageBase + sizeOfImage);
+				p += is32 ? 0x60 : 0x70;    // Skip optional header
+				p += 0x10 * 8;      // Skip data dirs
+				sectionsAddr = new IntPtr(p);
+			}
+
+			/// <summary>
+			/// Checks whether the address is within the image
+			/// </summary>
+			/// <param name="addr">Address</param>
+			public unsafe bool IsValidImageAddress(IntPtr addr) {
+				return IsValidImageAddress((void*)addr, 0);
+			}
+
+			/// <summary>
+			/// Checks whether the address is within the image
+			/// </summary>
+			/// <param name="addr">Address</param>
+			/// <param name="size">Number of bytes</param>
+			public unsafe bool IsValidImageAddress(IntPtr addr, uint size) {
+				return IsValidImageAddress((void*)addr, size);
+			}
+
+			/// <summary>
+			/// Checks whether the address is within the image
+			/// </summary>
+			/// <param name="addr">Address</param>
+			public unsafe bool IsValidImageAddress(void* addr) {
+				return IsValidImageAddress(addr, 0);
+			}
+
+			/// <summary>
+			/// Checks whether the address is within the image
+			/// </summary>
+			/// <param name="addr">Address</param>
+			/// <param name="size">Number of bytes</param>
+			public unsafe bool IsValidImageAddress(void* addr, uint size) {
+				if (addr < (void*)imageBase)
+					return false;
+				if (addr >= (void*)imageEnd)
+					return false;
+
+				if (size != 0) {
+					if ((byte*)addr + size < (void*)addr)
+						return false;
+					if ((byte*)addr + size > (void*)imageEnd)
+						return false;
+				}
+
+				return true;
+			}
+
+			/// <summary>
+			/// Finds a section
+			/// </summary>
+			/// <param name="name">Name of section</param>
+			/// <param name="sectionStart">Updated with start address of section</param>
+			/// <param name="sectionSize">Updated with size of section</param>
+			/// <returns><c>true</c> on success, <c>false</c> on failure</returns>
+			public unsafe bool FindSection(string name, out IntPtr sectionStart, out uint sectionSize) {
+				var nameBytes = Encoding.UTF8.GetBytes(name + "\0\0\0\0\0\0\0\0");
+				for (int i = 0; i < numSects; i++) {
+					byte* p = (byte*)sectionsAddr + i * 0x28;
+					if (!CompareSectionName(p, nameBytes))
+						continue;
+
+					sectionStart = new IntPtr((byte*)imageBase + *(uint*)(p + 12));
+					sectionSize = Math.Max(*(uint*)(p + 8), *(uint*)(p + 16));
+					return true;
+				}
+
+				sectionStart = IntPtr.Zero;
+				sectionSize = 0;
+				return false;
+			}
+
+			static unsafe bool CompareSectionName(byte* sectionName, byte[] nameBytes) {
+				for (int i = 0; i < 8; i++) {
+					if (*sectionName != nameBytes[i])
+						return false;
+					sectionName++;
+				}
+				return true;
+			}
+
+			/// <summary>
+			/// Checks whether a pointer is aligned
+			/// </summary>
+			/// <param name="addr">Address</param>
+			public static bool IsAlignedPointer(IntPtr addr) {
+				return ((int)addr.ToInt64() & (IntPtr.Size - 1)) == 0;
+			}
+
+			/// <summary>
+			/// Checks whether a pointer is aligned
+			/// </summary>
+			/// <param name="addr">Address</param>
+			/// <param name="alignment">Alignment</param>
+			public static bool IsAligned(IntPtr addr, uint alignment) {
+				return ((uint)addr.ToInt64() & (alignment - 1)) == 0;
+			}
+
+			/// <inheritdoc/>
+			public override string ToString() {
+				return string.Format("{0:X8} - {1:X8}", (ulong)imageBase.ToInt64(), (ulong)imageEnd.ToInt64());
+			}
 		}
 	}
 }
