@@ -3,6 +3,7 @@
 
 using System;
 using System.Diagnostics;
+using System.Reflection;
 using Antinet;
 
 namespace antinet_test {
@@ -29,8 +30,9 @@ namespace antinet_test {
 			Console.WriteLine();
 
 			CheckAll();
-			Console.WriteLine("Try to attach a debugger.");
+			Console.WriteLine("Try to attach a debugger and try setting a breakpoint in \"BreakpointTest()\".");
 			Console.ReadKey(true);
+			BreakpointTest();
 			Console.WriteLine(sep);
 
 			CheckAll();
@@ -47,6 +49,13 @@ namespace antinet_test {
 			Console.WriteLine("AntiDebugger.HasManagedDebugger(): {0}", AntiDebugger.HasManagedDebugger());
 			Console.WriteLine("AntiDebugger.HasDebugger(): {0}", AntiDebugger.HasDebugger());
 			Console.WriteLine("AntiPatcher.VerifyClrPEHeader(): {0}", AntiPatcher.VerifyClrPEHeader());
+		}
+
+		[Obfuscation(Exclude = true)]
+		public static void BreakpointTest() {
+			Console.WriteLine("BreakpointTest1");
+			Console.WriteLine("BreakpointTest2");
+			Console.WriteLine("BreakpointTest3");
 		}
 	}
 }
