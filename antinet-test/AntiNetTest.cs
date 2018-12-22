@@ -14,7 +14,7 @@ namespace antinet_test {
 			Console.WriteLine("CLR: {0} - {1}", Environment.Version, IntPtr.Size == 4 ? "x86" : "x64");
 			Console.WriteLine();
 
-			CheckDebugger();
+			CheckAll();
 			Console.WriteLine("Press any key to initialize anti-managed debugger code...");
 			Console.ReadKey(true);
 			Console.WriteLine(sep);
@@ -28,12 +28,12 @@ namespace antinet_test {
 			}
 			Console.WriteLine();
 
-			CheckDebugger();
+			CheckAll();
 			Console.WriteLine("Try to attach a debugger.");
 			Console.ReadKey(true);
 			Console.WriteLine(sep);
 
-			CheckDebugger();
+			CheckAll();
 			Console.WriteLine("Let's exit. Press any key (again!)...");
 			Console.ReadKey(true);
 			Console.WriteLine(sep);
@@ -41,11 +41,12 @@ namespace antinet_test {
 			return 0;
 		}
 
-		private static void CheckDebugger() {
+		private static void CheckAll() {
 			Console.WriteLine("Debugger.IsAttached: {0}", Debugger.IsAttached);
-			Console.WriteLine("AntiDebugger.CheckUnmanagedDebugger(): {0}", AntiDebugger.CheckUnmanagedDebugger());
-			Console.WriteLine("AntiDebugger.CheckManagedDebugger(): {0}", AntiDebugger.CheckManagedDebugger());
-			Console.WriteLine("AntiDebugger.CheckDebugger(): {0}", AntiDebugger.CheckDebugger());
+			Console.WriteLine("AntiDebugger.HasUnmanagedDebugger(): {0}", AntiDebugger.HasUnmanagedDebugger());
+			Console.WriteLine("AntiDebugger.HasManagedDebugger(): {0}", AntiDebugger.HasManagedDebugger());
+			Console.WriteLine("AntiDebugger.HasDebugger(): {0}", AntiDebugger.HasDebugger());
+			Console.WriteLine("AntiPatcher.VerifyClrPEHeader(): {0}", AntiPatcher.VerifyClrPEHeader());
 		}
 	}
 }

@@ -38,6 +38,7 @@
   <ItemGroup>
     <Compile Include="AntiDebugger.cs" />
     <Compile Include="AntiManagedDebugger.cs" />
+    <Compile Include="AntiPatcher.Old.cs" />
     <Compile Include="AntiPatcher.cs" />
     <Compile Include="DynamicCrc32.cs" />
     <Compile Include="HandleProcessCorruptedStateExceptionsAttribute.cs" />
